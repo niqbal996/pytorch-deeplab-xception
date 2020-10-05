@@ -9,6 +9,8 @@ class Path(object):
             return '/path/to/datasets/cityscapes/'     # foler that contains leftImg8bit/
         elif dataset == 'coco':
             return '/path/to/datasets/coco/'
+        elif dataset == 'cropweed':
+            return '/home/robot/datasets/structured_cwc/'
         else:
             print('Dataset {} not available.'.format(dataset))
             raise NotImplementedError
