@@ -44,7 +44,7 @@ class Bottleneck(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, block, layers, output_stride, BatchNorm, pretrained=True):
+    def __init__(self, block, layers, in_channels, output_stride, BatchNorm, pretrained=True):
         self.inplanes = 64
         super(ResNet, self).__init__()
         blocks = [1, 2, 4]
@@ -58,7 +58,7 @@ class ResNet(nn.Module):
             raise NotImplementedError
 
         # Modules
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
+        self.conv1 = nn.Conv2d(in_channels, 64, kernel_size=7, stride=2, padding=3,
                                 bias=False)
         self.bn1 = BatchNorm(64)
         self.relu = nn.ReLU(inplace=True)
@@ -72,7 +72,10 @@ class ResNet(nn.Module):
         self._init_weight()
 
         if pretrained:
-            self._load_pretrained_model()
+            if in_channels == 3:
+                self._load_pretrained_model()
+            else:
+                self._load_pretrained_model(skip_first_layer=True)
 
     def _make_layer(self, block, planes, blocks, stride=1, dilation=1, BatchNorm=None):
         downsample = None
@@ -135,28 +138,32 @@ class ResNet(nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
-    def _load_pretrained_model(self):
+    def _load_pretrained_model(self, skip_first_layer=False):
         pretrain_dict = model_zoo.load_url('https://download.pytorch.org/models/resnet101-5d3b4d8f.pth')
         model_dict = {}
         state_dict = self.state_dict()
         for k, v in pretrain_dict.items():
             if k in state_dict:
                 model_dict[k] = v
+        # If the input channels are not RGB then pretrained weights loading will not work. skip first layer in that case
+        if skip_first_layer:            # RGB if input channels of first layer == 3
+            # skip loading weights for this layer
+            del model_dict['conv1.weight']
         state_dict.update(model_dict)
         self.load_state_dict(state_dict)
 
-def ResNet101(output_stride, BatchNorm, pretrained=True):
+def ResNet101(output_stride, in_channels, BatchNorm, pretrained=True):
     """Constructs a ResNet-101 model.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
-    model = ResNet(Bottleneck, [3, 4, 23, 3], output_stride, BatchNorm, pretrained=pretrained)
+    model = ResNet(Bottleneck, [3, 4, 23, 3], in_channels, output_stride, BatchNorm, pretrained=pretrained)
     return model
 
 if __name__ == "__main__":
     import torch
-    model = ResNet101(BatchNorm=nn.BatchNorm2d, pretrained=True, output_stride=8)
-    input = torch.rand(1, 3, 512, 512)
+    model = ResNet101(in_channels=4, BatchNorm=nn.BatchNorm2d, pretrained=True, output_stride=8)
+    input = torch.rand(1, 4, 512, 512)
     output, low_level_feat = model(input)
     print(output.size())
     print(low_level_feat.size())
