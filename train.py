@@ -13,6 +13,7 @@ from utils.lr_scheduler import LR_Scheduler
 from utils.saver import Saver
 from utils.summaries import TensorboardSummary
 from utils.metrics import Evaluator
+import cv2
 
 class Trainer(object):
     def __init__(self, args):
@@ -26,12 +27,14 @@ class Trainer(object):
         self.writer = self.summary.create_summary()
         
         # Define Dataloader
-        kwargs = {'num_workers': args.workers, 'pin_memory': True}
+        # kwargs = {'num_workers': args.workers, 'pin_memory': True}
+        kwargs = {'num_workers': 1, 'pin_memory': True}
         self.train_loader, self.val_loader, self.test_loader, self.nclass = make_data_loader(args, **kwargs)
 
         # Define network
         model = DeepLab(num_classes=self.nclass,
                         backbone=args.backbone,
+                        in_channels=4,
                         output_stride=args.out_stride,
                         sync_bn=args.sync_bn,
                         freeze_bn=args.freeze_bn)
@@ -112,7 +115,14 @@ class Trainer(object):
             # Show 10 * 3 inference results each epoch
             if i % (num_img_tr // 10) == 0:
                 global_step = i + num_img_tr * epoch
-                self.summary.visualize_image(self.writer, self.args.dataset, image, target, output, global_step)
+                # place_holder_target = target
+                # place_holder_output = output
+                self.summary.visualize_image(self.writer,
+                                             self.args.dataset,
+                                             image,
+                                             target,
+                                             output,
+                                             global_step)
 
         self.writer.add_scalar('train/total_loss_epoch', train_loss, epoch)
         print('[Epoch: %d, numImages: %5d]' % (epoch, i * self.args.batch_size + image.data.shape[0]))
@@ -175,6 +185,112 @@ class Trainer(object):
                 'best_pred': self.best_pred,
             }, is_best)
 
+    def testing(self, epoch):
+        self.model.eval()
+        self.evaluator.reset()
+        tbar = tqdm(self.test_loader, desc='\r')
+        test_loss = 0.0
+        # ctr = 0
+        # total_labels = []
+        # true_plant_labels = []
+        # true_weed_labels = []
+        # pred_plant_labels = []
+        # pred_weed_labels = []
+        for i, sample in enumerate(tbar):
+            image, target = sample['image'], sample['label']
+            if self.args.cuda:
+                image, target = image.cuda(), target.cuda()
+            with torch.no_grad():
+                output = self.model(image)
+            loss = self.criterion(output, target)
+            test_loss += loss.item()
+            tbar.set_description('Test loss: %.3f' % (test_loss / (i + 1)))
+            pred = output.data.cpu().numpy()
+            target = target.cpu().numpy()
+            pred = np.argmax(pred, axis=1)
+            self.evaluator.add_batch(target, pred)
+            # Add batch sample into evaluator
+            # prediction = np.append(target, pred, axis=2)
+            # font = cv2.FONT_HERSHEY_SIMPLEX
+            # bottomLeftCornerOfText = (10, 500)
+            # fontScale = 1
+            # fontColor = (255, 255, 255)
+            # lineType = 2
+            #
+            # print('hold')
+            # # for sample in range(image.shape[0]):
+            # #     label_mask = prediction[sample, :, :]
+            # #     rgb = np.zeros((label_mask.shape[0], label_mask.shape[1], 3))
+            # #     r = label_mask.copy()
+            # #     g = label_mask.copy()
+            # #     b = label_mask.copy()
+            # #
+            # #     g[g != 1] = 0
+            # #     g[g == 1] = 255
+            # #
+            # #     r[r != 2] = 0
+            # #     r[r == 2] = 255
+            # #     b = np.zeros(b.shape)
+            # #
+            # #     rgb[:, :, 0] = b
+            # #     rgb[:, :, 1] = g
+            # #     rgb[:, :, 2] = r
+            # #
+            # #     cv2.putText(rgb, 'Ground truth',
+            # #                 (10, 30),
+            # #                 font,
+            # #                 fontScale,
+            # #                 fontColor,
+            # #                 lineType)
+            # #
+            # #     cv2.putText(rgb, 'Prediction',
+            # #                 (800, 30),
+            # #                 font,
+            # #                 fontScale,
+            # #                 fontColor,
+            # #                 lineType)
+            # #     cv2.line(rgb, (513, 0), (513, 1020), (255, 255, 255), thickness=1)
+            # #     cv2.imshow('image', rgb)
+            # #     # cv2.imwrite('/home/robot/PycharmProjects/pytorch-deeplab-xception/run/cropweed/deeplab-resnet/experiment_12/test_samples/sample_{}.png'.format(ctr), rgb.astype(np.uint8))
+            # #     ctr += 1
+            # for batch_sample in range(target.shape[0]):
+            #     total_labels += np.where(target[batch_sample, :, :] != 0)
+            #     true_plant_labels += np.where(target[batch_sample, :, :] == 1)
+            #     true_weed_labels += np.where(target[batch_sample, :, :] == 2)
+            #     pred_plant_labels += np.where(pred[batch_sample, :, :] == 1)
+            #     pred_weed_labels += np.where(pred[batch_sample, :, :] == 2)
+            # wrong_labels = np.where(target == 1 & pred != 1)
+
+
+        print('hold')
+        # Fast test during the training
+        Acc = self.evaluator.Pixel_Accuracy()
+        Acc_class = self.evaluator.Pixel_Accuracy_Class()
+        mIoU = self.evaluator.Mean_Intersection_over_Union()
+        FWIoU = self.evaluator.Frequency_Weighted_Intersection_over_Union()
+        print('[INFO] Network performance measures on the test dataset are as follows: \n '
+              'mIOU: {} \n FWIOU: {} \n Class accuracy: {} \n Pixel Accuracy: {}'.format(mIoU, FWIoU, Acc_class, Acc))
+        # self.writer.add_scalar('val/total_loss_epoch', test_loss, epoch)
+        # self.writer.add_scalar('val/mIoU', mIoU, epoch)
+        # self.writer.add_scalar('val/Acc', Acc, epoch)
+        # self.writer.add_scalar('val/Acc_class', Acc_class, epoch)
+        # self.writer.add_scalar('val/fwIoU', FWIoU, epoch)
+        # print('Validation:')
+        # print('[Epoch: %d, numImages: %5d]' % (epoch, i * self.args.batch_size + image.data.shape[0]))
+        # print("Acc:{}, Acc_class:{}, mIoU:{}, fwIoU: {}".format(Acc, Acc_class, mIoU, FWIoU))
+        # print('Loss: %.3f' % test_loss)
+        #
+        # new_pred = mIoU
+        # if new_pred > self.best_pred:
+        #     is_best = True
+        #     self.best_pred = new_pred
+        #     self.saver.save_checkpoint({
+        #         'epoch': epoch + 1,
+        #         'state_dict': self.model.module.state_dict(),
+        #         'optimizer': self.optimizer.state_dict(),
+        #         'best_pred': self.best_pred,
+        #     }, is_best)
+
 def main():
     parser = argparse.ArgumentParser(description="PyTorch DeeplabV3Plus Training")
     parser.add_argument('--backbone', type=str, default='resnet',
@@ -182,17 +298,19 @@ def main():
                         help='backbone name (default: resnet)')
     parser.add_argument('--out-stride', type=int, default=16,
                         help='network output stride (default: 8)')
-    parser.add_argument('--dataset', type=str, default='pascal',
-                        choices=['pascal', 'coco', 'cityscapes'],
-                        help='dataset name (default: pascal)')
+    parser.add_argument('--dataset', type=str, default='cropweed',
+                        choices=['pascal', 'coco', 'cityscapes', 'cropweed'],
+                        help='dataset name (default: cropweed)')
     parser.add_argument('--use-sbd', action='store_true', default=True,
                         help='whether to use SBD dataset (default: True)')
     parser.add_argument('--workers', type=int, default=4,
                         metavar='N', help='dataloader threads')
-    parser.add_argument('--base-size', type=int, default=513,
+    parser.add_argument('--base-size', type=int, default=1296,
                         help='base image size')
     parser.add_argument('--crop-size', type=int, default=513,
                         help='crop image size')
+    parser.add_argument('--uniform-scale', type=bool, default=False,
+                        help='resized image to be 1:1 aspect ratio')
     parser.add_argument('--sync-bn', type=bool, default=None,
                         help='whether to use sync bn (default: auto)')
     parser.add_argument('--freeze-bn', type=bool, default=False,
@@ -243,7 +361,7 @@ def main():
                         help='finetuning on a different dataset')
     # evaluation option
     parser.add_argument('--eval-interval', type=int, default=1,
-                        help='evaluuation interval (default: 1)')
+                        help='evaluation interval (default: 1)')
     parser.add_argument('--no-val', action='store_true', default=False,
                         help='skip validation during training')
 
@@ -267,6 +385,7 @@ def main():
             'coco': 30,
             'cityscapes': 200,
             'pascal': 50,
+            'cropweed': 10,
         }
         args.epochs = epoches[args.dataset.lower()]
 
@@ -281,6 +400,7 @@ def main():
             'coco': 0.1,
             'cityscapes': 0.01,
             'pascal': 0.007,
+            'cropweed': 0.01,
         }
         args.lr = lrs[args.dataset.lower()] / (4 * len(args.gpu_ids)) * args.batch_size
 
@@ -296,6 +416,7 @@ def main():
         trainer.training(epoch)
         if not trainer.args.no_val and epoch % args.eval_interval == (args.eval_interval - 1):
             trainer.validation(epoch)
+    # trainer.testing(10)
 
     trainer.writer.close()
 
