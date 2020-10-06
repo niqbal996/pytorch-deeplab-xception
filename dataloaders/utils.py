@@ -107,5 +107,5 @@ def get_pascal_labels():
 def get_plant_labels():
     return np.array([
         [0, 0, 0],
-        [128, 128, 128],
-        [255, 255, 255]])
+        [0, 255, 0],
+        [255, 0, 0]])

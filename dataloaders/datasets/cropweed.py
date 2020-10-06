@@ -40,16 +40,20 @@ class CropWeedSegmentation(data.Dataset):
     def __getitem__(self, index):
 
         img_path = self.files[self.split][index].rstrip()
+        nir_image = os.path.join('/home/robot/datasets/cwc_dataset/images/nir/',
+                                 os.path.basename(img_path)[:-4] + '.png')
         lbl_path = os.path.join(self.annotations_base,
                                 os.path.basename(img_path)[:-4] + '.png')
 
-        _img = Image.open(img_path).convert('RGB')
+        _img = Image.open(img_path).convert('RGB')   # width x height x 3
+        _nir = Image.open(nir_image).convert('L')    # width x height x 1
+        _img.putalpha(_nir)                          # width x height x 4
+
         _tmp = np.array(Image.open(lbl_path), dtype=np.uint8)
         _tmp[_tmp == 255] = 1
         _tmp[_tmp == 0] = 0
         _tmp[_tmp == 128] = 2
-        # import numpy
-        # print(numpy.unique(_tmp))
+
         _tmp = self.encode_segmap(_tmp)
         _target = Image.fromarray(_tmp)
 
@@ -57,7 +61,7 @@ class CropWeedSegmentation(data.Dataset):
 
         if self.split == 'train':
             return self.transform_tr(sample)
-        elif self.split == 'val':
+        elif self.split == 'valid':
             return self.transform_val(sample)
         elif self.split == 'test':
             return self.transform_ts(sample)
@@ -84,7 +88,8 @@ class CropWeedSegmentation(data.Dataset):
             tr.RandomHorizontalFlip(),
             tr.RandomScaleCrop(base_size=self.args.base_size, crop_size=self.args.crop_size, fill=255),
             tr.RandomGaussianBlur(),
-            tr.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            tr.Normalize(mean=(0.485, 0.456, 0.406, 0.424), std=(0.229, 0.224, 0.225, 0.221)),
+            # tr.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             tr.ToTensor()])
 
         return composed_transforms(sample)
@@ -93,7 +98,8 @@ class CropWeedSegmentation(data.Dataset):
 
         composed_transforms = transforms.Compose([
             tr.FixScaleCrop(crop_size=self.args.crop_size),
-            tr.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            tr.Normalize(mean=(0.485, 0.456, 0.406, 0.424), std=(0.229, 0.224, 0.225, 0.221)),
+            # tr.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             tr.ToTensor()])
 
         return composed_transforms(sample)
@@ -102,7 +108,8 @@ class CropWeedSegmentation(data.Dataset):
 
         composed_transforms = transforms.Compose([
             tr.FixedResize(size=self.args.crop_size),
-            tr.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            tr.Normalize(mean=(0.485, 0.456, 0.406, 0.424), std=(0.229, 0.224, 0.225, 0.221)),
+            # tr.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             tr.ToTensor()])
 
         return composed_transforms(sample)
@@ -115,8 +122,10 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     args = parser.parse_args()
-    args.base_size = 513
-    args.crop_size = 513
+    args.base_size = 1296
+    # args.base_size = 384
+
+    args.crop_size = 512
 
     cityscapes_train = CropWeedSegmentation(args, split='train')
 
