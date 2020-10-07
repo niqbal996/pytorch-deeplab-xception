@@ -6,8 +6,9 @@
 
 ### TODO
 - [x] Support different backbones
-- [x] Support VOC, SBD, Cityscapes and COCO datasets
+- [x] Support VOC, SBD, Cityscapes, SugarBeet  and COCO datasets
 - [x] Multi-GPU training
+- [x] Support for RGB+NIR (4 input channels) model training
 
 
 
@@ -16,6 +17,7 @@
 | ResNet    | 16/16          | 78.43%     | [google drive](https://drive.google.com/open?id=1NwcwlWqA-0HqAPk3dSNNPipGMF0iS0Zu) |
 | MobileNet | 16/16          | 70.81%     | [google drive](https://drive.google.com/open?id=1G9mWafUAj09P4KvGSRVzIsV_U5OqFLdt) |
 | DRN       | 16/16          | 78.87%     | [google drive](https://drive.google.com/open?id=131gZN_dKEXO79NknIQazPJ-4UmRrZAfI) |
+| ResNet (Sugarbeet-RGB only)  | 10/10          | 79.06%     | Not available |
 
 
 
@@ -26,6 +28,7 @@ using Pascal VOC 2012, SBD and Cityscapes datasets.
 
 ![Results](doc/results.png)
 
+![Resulst](doc/plant_segmentation.png)
 
 ### Installation
 The code was tested with Anaconda and Python 3.6. After installing the Anaconda environment:
@@ -74,6 +77,10 @@ Follow steps below to train your model:
     ```Shell
     bash train_coco.sh
     ```    
+4. To train deeplabv3+ using Sugar beet 2016 dataset and ResNet as backbone:
+    ```Shell
+    bash train_sugar_beet.sh
+    ```    
 
 ### Acknowledgement
 [PyTorch-Encoding](https://github.com/zhanghang1989/PyTorch-Encoding)
@@ -81,3 +88,5 @@ Follow steps below to train your model:
 [Synchronized-BatchNorm-PyTorch](https://github.com/vacancy/Synchronized-BatchNorm-PyTorch)
 
 [drn](https://github.com/fyu/drn)
+
+[Sugar Beet 2016 dataset](https://www.ipb.uni-bonn.de/data/sugarbeets2016/)
