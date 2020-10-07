@@ -38,15 +38,20 @@ def make_data_loader(args, **kwargs):
         return train_loader, val_loader, test_loader, num_class
 
     elif args.dataset == 'cropweed':
-        train_set = cropweed.CropWeedSegmentation(args, split='train')
-        val_set = cropweed.CropWeedSegmentation(args, split='valid')
-        # test_set = cropweed.CropWeedSegmentation(args, split='test')
-
-        num_class = train_set.NUM_CLASSES
-        train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, **kwargs)
-        val_loader = DataLoader(val_set, batch_size=args.batch_size, shuffle=False, **kwargs)
-        # test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=False, **kwargs)
-        test_loader = None
+        if args.infer:
+            train_set = cropweed.CropWeedSegmentation(args, split='train')
+            train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, **kwargs)
+            val_loader = None
+            test_set = cropweed.CropWeedSegmentation(args, split='test')
+            num_class = train_set.NUM_CLASSES
+            test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=False, **kwargs)
+        else:
+            train_set = cropweed.CropWeedSegmentation(args, split='train')
+            val_set = cropweed.CropWeedSegmentation(args, split='valid')
+            num_class = train_set.NUM_CLASSES
+            train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, **kwargs)
+            val_loader = DataLoader(val_set, batch_size=args.batch_size, shuffle=False, **kwargs)
+            test_loader = None
 
         return train_loader, val_loader, test_loader, num_class
 
