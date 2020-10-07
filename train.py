@@ -27,14 +27,19 @@ class Trainer(object):
         self.writer = self.summary.create_summary()
         
         # Define Dataloader
-        # kwargs = {'num_workers': args.workers, 'pin_memory': True}
-        kwargs = {'num_workers': 1, 'pin_memory': True}
+        kwargs = {'num_workers': args.workers, 'pin_memory': True}
+        # kwargs = {'num_workers': 0, 'pin_memory': True}
         self.train_loader, self.val_loader, self.test_loader, self.nclass = make_data_loader(args, **kwargs)
+
+        if args.nir:
+            input_channels = 4
+        else:
+            input_channels = 3
 
         # Define network
         model = DeepLab(num_classes=self.nclass,
                         backbone=args.backbone,
-                        in_channels=4,
+                        in_channels=input_channels,
                         output_stride=args.out_stride,
                         sync_bn=args.sync_bn,
                         freeze_bn=args.freeze_bn)
@@ -185,17 +190,16 @@ class Trainer(object):
                 'best_pred': self.best_pred,
             }, is_best)
 
-    def testing(self, epoch):
+    def testing(self):
         self.model.eval()
         self.evaluator.reset()
         tbar = tqdm(self.test_loader, desc='\r')
         test_loss = 0.0
         # ctr = 0
-        # total_labels = []
-        # true_plant_labels = []
-        # true_weed_labels = []
-        # pred_plant_labels = []
-        # pred_weed_labels = []
+        # fontscale = 1
+        # fontcolor = (255, 255, 255)
+        # linetype = 2
+        # font = cv2.FONT_HERSHEY_SIMPLEX
         for i, sample in enumerate(tbar):
             image, target = sample['image'], sample['label']
             if self.args.cuda:
@@ -210,86 +214,78 @@ class Trainer(object):
             pred = np.argmax(pred, axis=1)
             self.evaluator.add_batch(target, pred)
             # Add batch sample into evaluator
-            # prediction = np.append(target, pred, axis=2)
-            # font = cv2.FONT_HERSHEY_SIMPLEX
-            # bottomLeftCornerOfText = (10, 500)
-            # fontScale = 1
-            # fontColor = (255, 255, 255)
-            # lineType = 2
+            prediction = np.append(target, pred, axis=2)
+            # print(pred.shape)
+            # input = image[0, 0:3, :, :].cpu().numpy().transpose([1, 2, 0])
+            # cv2.imshow('figure', input)
+            # rgb = np.zeros((pred.shape[1], pred.shape[2], 3))
             #
-            # print('hold')
-            # # for sample in range(image.shape[0]):
-            # #     label_mask = prediction[sample, :, :]
-            # #     rgb = np.zeros((label_mask.shape[0], label_mask.shape[1], 3))
-            # #     r = label_mask.copy()
-            # #     g = label_mask.copy()
-            # #     b = label_mask.copy()
-            # #
-            # #     g[g != 1] = 0
-            # #     g[g == 1] = 255
-            # #
-            # #     r[r != 2] = 0
-            # #     r[r == 2] = 255
-            # #     b = np.zeros(b.shape)
-            # #
-            # #     rgb[:, :, 0] = b
-            # #     rgb[:, :, 1] = g
-            # #     rgb[:, :, 2] = r
-            # #
-            # #     cv2.putText(rgb, 'Ground truth',
-            # #                 (10, 30),
-            # #                 font,
-            # #                 fontScale,
-            # #                 fontColor,
-            # #                 lineType)
-            # #
-            # #     cv2.putText(rgb, 'Prediction',
-            # #                 (800, 30),
-            # #                 font,
-            # #                 fontScale,
-            # #                 fontColor,
-            # #                 lineType)
-            # #     cv2.line(rgb, (513, 0), (513, 1020), (255, 255, 255), thickness=1)
-            # #     cv2.imshow('image', rgb)
-            # #     # cv2.imwrite('/home/robot/PycharmProjects/pytorch-deeplab-xception/run/cropweed/deeplab-resnet/experiment_12/test_samples/sample_{}.png'.format(ctr), rgb.astype(np.uint8))
-            # #     ctr += 1
-            # for batch_sample in range(target.shape[0]):
-            #     total_labels += np.where(target[batch_sample, :, :] != 0)
-            #     true_plant_labels += np.where(target[batch_sample, :, :] == 1)
-            #     true_weed_labels += np.where(target[batch_sample, :, :] == 2)
-            #     pred_plant_labels += np.where(pred[batch_sample, :, :] == 1)
-            #     pred_weed_labels += np.where(pred[batch_sample, :, :] == 2)
-            # wrong_labels = np.where(target == 1 & pred != 1)
+            # r = pred[0, :, :].copy()
+            # g = pred[0, :, :].copy()
+            # b = pred[0, :, :].copy()
+            #
+            # g[g != 1] = 0
+            # g[g == 1] = 255
+            #
+            # r[r != 2] = 0
+            # r[r == 2] = 255
+            # b = np.zeros(b.shape)
+            #
+            # rgb[:, :, 0] = b
+            # rgb[:, :, 1] = g
+            # rgb[:, :, 2] = r
 
+            # print(input.shape)
+            # print(rgb.shape)
+            # combi = np.append(input, rgb, axis=1)
+            # print(combi.shape)
+            # cv2.imshow('figure', input)
+            # cv2.imwrite('/home/robot/PycharmProjects/pytorch-deeplab-xception/run/cropweed/deeplab-resnet/experiment_13/test_samples/sample_orig_combi_{}.png'.format(ctr), input.astype(np.uint8))
+            # ctr += 1
+            # for sample in range(image.shape[0]):
+            #     label_mask = prediction[sample, :, :]
+            #     rgb = np.zeros((label_mask.shape[0], label_mask.shape[1], 3))
+            #     r = label_mask.copy()
+            #     g = label_mask.copy()
+            #     b = label_mask.copy()
+            #
+            #     g[g != 1] = 0
+            #     g[g == 1] = 255
+            #
+            #     r[r != 2] = 0
+            #     r[r == 2] = 255
+            #     b = np.zeros(b.shape)
+            #
+            #     rgb[:, :, 0] = b
+            #     rgb[:, :, 1] = g
+            #     rgb[:, :, 2] = r
+            #
+            #     cv2.putText(rgb, 'Ground truth',
+            #                 (10, 30),
+            #                 font,
+            #                 fontscale,
+            #                 fontcolor,
+            #                 linetype)
+            #
+            #     cv2.putText(rgb, 'Prediction',
+            #                 (800, 30),
+            #                 font,
+            #                 fontscale,
+            #                 fontcolor,
+            #                 linetype)
+            #     cv2.line(rgb, (513, 0), (513, 1020), (255, 255, 255), thickness=1)
+            #     # cv2.imshow('image', rgb)
+            #     cv2.imwrite('/home/robot/PycharmProjects/pytorch-deeplab-xception/run/cropweed/deeplab-resnet/experiment_13/test_samples/sample_{}.png'.format(ctr), rgb.astype(np.uint8))
+            #     cv2.imwrite('/home/robot/PycharmProjects/pytorch-deeplab-xception/run/cropweed/deeplab-resnet/experiment_13/test_samples/sample_orig_{}.png'.format(ctr), rgb.astype(np.uint8))
+            #     ctr += 1
 
-        print('hold')
-        # Fast test during the training
+        # Fast test during the testing
         Acc = self.evaluator.Pixel_Accuracy()
         Acc_class = self.evaluator.Pixel_Accuracy_Class()
         mIoU = self.evaluator.Mean_Intersection_over_Union()
         FWIoU = self.evaluator.Frequency_Weighted_Intersection_over_Union()
         print('[INFO] Network performance measures on the test dataset are as follows: \n '
               'mIOU: {} \n FWIOU: {} \n Class accuracy: {} \n Pixel Accuracy: {}'.format(mIoU, FWIoU, Acc_class, Acc))
-        # self.writer.add_scalar('val/total_loss_epoch', test_loss, epoch)
-        # self.writer.add_scalar('val/mIoU', mIoU, epoch)
-        # self.writer.add_scalar('val/Acc', Acc, epoch)
-        # self.writer.add_scalar('val/Acc_class', Acc_class, epoch)
-        # self.writer.add_scalar('val/fwIoU', FWIoU, epoch)
-        # print('Validation:')
-        # print('[Epoch: %d, numImages: %5d]' % (epoch, i * self.args.batch_size + image.data.shape[0]))
-        # print("Acc:{}, Acc_class:{}, mIoU:{}, fwIoU: {}".format(Acc, Acc_class, mIoU, FWIoU))
-        # print('Loss: %.3f' % test_loss)
-        #
-        # new_pred = mIoU
-        # if new_pred > self.best_pred:
-        #     is_best = True
-        #     self.best_pred = new_pred
-        #     self.saver.save_checkpoint({
-        #         'epoch': epoch + 1,
-        #         'state_dict': self.model.module.state_dict(),
-        #         'optimizer': self.optimizer.state_dict(),
-        #         'best_pred': self.best_pred,
-        #     }, is_best)
 
 def main():
     parser = argparse.ArgumentParser(description="PyTorch DeeplabV3Plus Training")
@@ -318,6 +314,10 @@ def main():
     parser.add_argument('--loss-type', type=str, default='ce',
                         choices=['ce', 'focal'],
                         help='loss func type (default: ce)')
+    parser.add_argument('--infer', action='store_true', default=False,
+                        help='whether should execute inference with a trained model (default: False)')
+    parser.add_argument('--nir', action='store_true', default=False,
+                        help='whether should use nir channel or not (default: False)')
     # training hyper params
     parser.add_argument('--epochs', type=int, default=None, metavar='N',
                         help='number of epochs to train (default: auto)')
@@ -329,7 +329,7 @@ def main():
     parser.add_argument('--test-batch-size', type=int, default=None,
                         metavar='N', help='input batch size for \
                                 testing (default: auto)')
-    parser.add_argument('--use-balanced-weights', action='store_true', default=False,
+    parser.add_argument('--use-balanced-weights', action='store_true', default=True,
                         help='whether to use balanced weights (default: False)')
     # optimizer params
     parser.add_argument('--lr', type=float, default=None, metavar='LR',
@@ -385,7 +385,7 @@ def main():
             'coco': 30,
             'cityscapes': 200,
             'pascal': 50,
-            'cropweed': 10,
+            'cropweed': 20,
         }
         args.epochs = epoches[args.dataset.lower()]
 
@@ -412,11 +412,13 @@ def main():
     trainer = Trainer(args)
     print('Starting Epoch:', trainer.args.start_epoch)
     print('Total Epoches:', trainer.args.epochs)
-    for epoch in range(trainer.args.start_epoch, trainer.args.epochs):
-        trainer.training(epoch)
-        if not trainer.args.no_val and epoch % args.eval_interval == (args.eval_interval - 1):
-            trainer.validation(epoch)
-    # trainer.testing(10)
+    if args.infer:
+        trainer.testing()
+    else:
+        for epoch in range(trainer.args.start_epoch, trainer.args.epochs):
+            trainer.training(epoch)
+            if not trainer.args.no_val and epoch % args.eval_interval == (args.eval_interval - 1):
+                trainer.validation(epoch)
 
     trainer.writer.close()
 
