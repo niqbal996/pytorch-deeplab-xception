@@ -16,7 +16,7 @@ class CropWeedSegmentation(data.Dataset):
         self.split = split
         self.args = args
         self.files = {}
-
+        self.nir = args.nir
         self.images_base = os.path.join(self.root, self.split, 'img')
         self.annotations_base = os.path.join(self.root, self.split, 'lbl')
 
@@ -40,14 +40,16 @@ class CropWeedSegmentation(data.Dataset):
     def __getitem__(self, index):
 
         img_path = self.files[self.split][index].rstrip()
-        nir_image = os.path.join('/home/robot/datasets/cwc_dataset/images/nir/',
-                                 os.path.basename(img_path)[:-4] + '.png')
         lbl_path = os.path.join(self.annotations_base,
                                 os.path.basename(img_path)[:-4] + '.png')
-
-        _img = Image.open(img_path).convert('RGB')   # width x height x 3
-        _nir = Image.open(nir_image).convert('L')    # width x height x 1
-        _img.putalpha(_nir)                          # width x height x 4
+        if self.nir:
+            _img = Image.open(img_path).convert('RGB')  # width x height x 3
+            nir_image = os.path.join('/home/robot/datasets/cwc_dataset/images/nir/',
+                                     os.path.basename(img_path)[:-4] + '.png')
+            _nir = Image.open(nir_image).convert('L')  # width x height x 1
+            _img.putalpha(_nir)  # width x height x 4
+        else:
+            _img = Image.open(img_path).convert('RGB')  # width x height x 3
 
         _tmp = np.array(Image.open(lbl_path), dtype=np.uint8)
         _tmp[_tmp == 255] = 1
@@ -84,32 +86,45 @@ class CropWeedSegmentation(data.Dataset):
                 for filename in filenames if filename.endswith(suffix)]
 
     def transform_tr(self, sample):
+        if self.nir:
+            mean = (0.485, 0.456, 0.406, 0.424)         # TODO use another mean[3] value?
+            std = (0.229, 0.224, 0.225, 0.221)
+        else:
+            mean = (0.485, 0.456, 0.406)
+            std = (0.229, 0.224, 0.225)
         composed_transforms = transforms.Compose([
             tr.RandomHorizontalFlip(),
             tr.RandomScaleCrop(base_size=self.args.base_size, crop_size=self.args.crop_size, fill=255),
             tr.RandomGaussianBlur(),
-            tr.Normalize(mean=(0.485, 0.456, 0.406, 0.424), std=(0.229, 0.224, 0.225, 0.221)),
-            # tr.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            tr.Normalize(mean=mean, std=std),
             tr.ToTensor()])
 
         return composed_transforms(sample)
 
     def transform_val(self, sample):
-
+        if self.nir:
+            mean = (0.485, 0.456, 0.406, 0.424)         # TODO use another mean[3] value?
+            std = (0.229, 0.224, 0.225, 0.221)
+        else:
+            mean = (0.485, 0.456, 0.406)
+            std = (0.229, 0.224, 0.225)
         composed_transforms = transforms.Compose([
             tr.FixScaleCrop(crop_size=self.args.crop_size),
-            tr.Normalize(mean=(0.485, 0.456, 0.406, 0.424), std=(0.229, 0.224, 0.225, 0.221)),
-            # tr.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            tr.Normalize(mean=mean, std=std),
             tr.ToTensor()])
 
         return composed_transforms(sample)
 
     def transform_ts(self, sample):
-
+        if self.nir:
+            mean = (0.485, 0.456, 0.406, 0.424)         # TODO use another mean[3] value?
+            std = (0.229, 0.224, 0.225, 0.221)
+        else:
+            mean = (0.485, 0.456, 0.406)
+            std = (0.229, 0.224, 0.225)
         composed_transforms = transforms.Compose([
             tr.FixedResize(size=self.args.crop_size),
-            tr.Normalize(mean=(0.485, 0.456, 0.406, 0.424), std=(0.229, 0.224, 0.225, 0.221)),
-            # tr.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            tr.Normalize(mean=mean, std=std),
             tr.ToTensor()])
 
         return composed_transforms(sample)
