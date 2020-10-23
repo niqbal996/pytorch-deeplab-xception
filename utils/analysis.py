@@ -9,20 +9,20 @@ class Analysis(object):
         self.dict = tensors_dict
         self.tensor = self.get_tensor_from_key()
         self.image = self.tensor2image()
-        self.mask = self.image2mask()
         self.binary_image = self.image2binary()
-        self.crop_filter = self.binary_image[0:129, 129:129 * 2]     
-        self.weed_filter = self.binary_image[774:774+129, 387:387+129] 
-        
+        self.crop_filter = self.binary_image[0:129, 129:129 * 2]
+        self.weed_filter = self.binary_image[774:774 + 129, 387:387 + 129]
+        self.mask = self.image2mask()
+
     def image2binary(self, threshold=50):
-        binary_image = self.image.copy()
+        binary_image = self.image.copy() * 255
         binary_image[binary_image > threshold] = 255
         binary_image[binary_image < threshold] = 0
         return binary_image
     
     def image2mask(self):
-        out = np.zeros(self.tensor.shape, dtype=np.bool)
-        arra = self.tensor.copy()
+        out = np.zeros(self.image.shape, dtype=np.bool)
+        arra = self.image.copy()
         arra = arra.astype(np.bool)
         filta = self.crop_filter.copy()
         filta = filta.astype(np.bool)
@@ -31,15 +31,15 @@ class Analysis(object):
         for row in range(16):
             for col in range(16):
                 if ctr <= arra.shape[0]:
-                    curr = arra[(row * arra.shape[1]):(row + 1) * arra.shape[1],
-                                (col * arra.shape[2]):(col + 1) * arra.shape[2]] & filta
+                    curr = arra[(row * filta.shape[0]):(row + 1) * filta.shape[0],
+                                (col * filta.shape[1]):(col + 1) * filta.shape[1]] & filta
 
                     if np.count_nonzero(curr) > 0:
-                        out[(row * arra.shape[1]):(row + 1) * arra.shape[1],
-                            (col * arra.shape[2]):(col + 1) * arra.shape[2]] = plate
+                        out[(row * filta.shape[0]):(row + 1) * filta.shape[0],
+                            (col * filta.shape[1]):(col + 1) * filta.shape[1]] = plate
                     else:
-                        out[(row * arra.shape[1]):(row + 1) * arra.shape[1],
-                            (col * arra.shape[2]):(col + 1) * arra.shape[2]] = ~plate
+                        out[(row * filta.shape[0]):(row + 1) * filta.shape[0],
+                            (col * filta.shape[1]):(col + 1) * filta.shape[1]] = ~plate
 
                     ctr += 1
         return out
