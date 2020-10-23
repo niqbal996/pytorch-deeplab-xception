@@ -13,6 +13,8 @@ from utils.lr_scheduler import LR_Scheduler
 from utils.saver import Saver
 from utils.summaries import TensorboardSummary
 from utils.metrics import Evaluator
+from utils.analysis import Analysis
+
 import cv2
 from torchvision import transforms
 from dataloaders import custom_transforms as tr
@@ -20,7 +22,6 @@ from PIL import Image
 from glob import glob
 import collections
 from functools import partial
-import matplotlib.pyplot as plt
 
 class Denormalize(object):
     def __init__(self, mean, std, inplace=False):
@@ -290,6 +291,7 @@ class Trainer(object):
         with torch.no_grad():
             output = self.model(image)
 
+        see = Analysis('module.decoder.last_conv.6', activations)
         pred = output.data.cpu().numpy()
         target = target.cpu().numpy()
         pred = np.argmax(pred, axis=1)
@@ -448,7 +450,8 @@ def main():
     print('Total Epoches:', trainer.args.epochs)
     if args.infer:
         # trainer.testing()
-        files = glob('/home/robot/datasets/arox_samples/day2/weeds/*.jpg')
+        # files = glob('/home/robot/datasets/arox_samples/day2/weeds/*.jpg')    #AROX data
+        files = glob('/home/robot/datasets/structured_cwc/train/img/*.png')     # BonniRob data
         for file, index in zip(files, range(len(files))):
             trainer.pred_single_image(file, index)
     else:
