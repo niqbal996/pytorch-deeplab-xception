@@ -30,6 +30,27 @@ class Evaluator(object):
 
         FWIoU = (freq[freq > 0] * iu[freq > 0]).sum()
         return FWIoU
+    def per_class_accuracy(self):
+        classes = ['Soil', 'Crop', 'Weeds']
+
+        acc = np.zeros((3,))
+        acc[0] = round(self.confusion_matrix[2, 0] / self.confusion_matrix[2, :].sum() * 100, 2)
+        acc[1] = round(self.confusion_matrix[2, 1] / self.confusion_matrix[2, :].sum() * 100, 2)
+        acc[2] = round(self.confusion_matrix[2, 2] / self.confusion_matrix[2, :].sum() * 100, 2)
+
+        print('[INFO] Weeds classified as \n Soil: {} \n Crop: {} \n Weeds: {}'.format(acc[0], acc[1], acc[2]))
+
+        acc[0] = round(self.confusion_matrix[1, 0] / self.confusion_matrix[1, :].sum() * 100, 2)
+        acc[1] = round(self.confusion_matrix[1, 1] / self.confusion_matrix[1, :].sum() * 100, 2)
+        acc[2] = round(self.confusion_matrix[1, 2] / self.confusion_matrix[1, :].sum() * 100, 2)
+
+        print('[INFO] Crops classified as \n Soil: {} \n Crop: {} \n Weeds: {}'.format(acc[0], acc[1], acc[2]))
+
+        acc[0] = round(self.confusion_matrix[0, 0] / self.confusion_matrix[0, :].sum() * 100, 2)
+        acc[1] = round(self.confusion_matrix[0, 1] / self.confusion_matrix[0, :].sum() * 100, 2)
+        acc[2] = round(self.confusion_matrix[0, 2] / self.confusion_matrix[0, :].sum() * 100, 2)
+
+        print('[INFO] Soil classified as \n Soil: {} \n Crop: {} \n Weeds: {}'.format(acc[0], acc[1], acc[2]))
 
     def _generate_matrix(self, gt_image, pre_image):
         mask = (gt_image >= 0) & (gt_image < self.num_class)
