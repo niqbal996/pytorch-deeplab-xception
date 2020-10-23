@@ -14,6 +14,28 @@ from utils.saver import Saver
 from utils.summaries import TensorboardSummary
 from utils.metrics import Evaluator
 import cv2
+from torchvision import transforms
+from dataloaders import custom_transforms as tr
+from PIL import Image
+from glob import glob
+import collections
+from functools import partial
+import matplotlib.pyplot as plt
+
+class Denormalize(object):
+    def __init__(self, mean, std, inplace=False):
+        self.mean = mean
+        self.demean = [-m/s for m, s in zip(mean, std)]
+        self.std = std
+        self.destd = [1/s for s in std]
+        self.inplace = inplace
+
+    def __call__(self, tensor):
+        tensor = transforms.Normalize(self.demean, self.destd, self.inplace)
+        # clamp to get rid of numerical errors
+        return torch.clamp(tensor, 0.0, 1.0)
+
+
 
 class Trainer(object):
     def __init__(self, args):
@@ -27,8 +49,8 @@ class Trainer(object):
         self.writer = self.summary.create_summary()
         
         # Define Dataloader
-        kwargs = {'num_workers': args.workers, 'pin_memory': True}
-        # kwargs = {'num_workers': 0, 'pin_memory': True}
+        # kwargs = {'num_workers': args.workers, 'pin_memory': True}
+        kwargs = {'num_workers': 0, 'pin_memory': True}
         self.train_loader, self.val_loader, self.test_loader, self.nclass = make_data_loader(args, **kwargs)
 
         if args.nir:
@@ -57,6 +79,9 @@ class Trainer(object):
             classes_weights_path = os.path.join(Path.db_root_dir(args.dataset), args.dataset+'_classes_weights.npy')
             if os.path.isfile(classes_weights_path):
                 weight = np.load(classes_weights_path)
+                weight[1] = 4
+                weight[2] = 2
+                weight[0] = 1
             else:
                 weight = calculate_weigths_labels(args.dataset, self.train_loader, self.nclass)
             weight = torch.from_numpy(weight.astype(np.float32))
@@ -195,11 +220,6 @@ class Trainer(object):
         self.evaluator.reset()
         tbar = tqdm(self.test_loader, desc='\r')
         test_loss = 0.0
-        # ctr = 0
-        # fontscale = 1
-        # fontcolor = (255, 255, 255)
-        # linetype = 2
-        # font = cv2.FONT_HERSHEY_SIMPLEX
         for i, sample in enumerate(tbar):
             image, target = sample['image'], sample['label']
             if self.args.cuda:
@@ -215,69 +235,10 @@ class Trainer(object):
             self.evaluator.add_batch(target, pred)
             # Add batch sample into evaluator
             prediction = np.append(target, pred, axis=2)
-            # print(pred.shape)
-            # input = image[0, 0:3, :, :].cpu().numpy().transpose([1, 2, 0])
-            # cv2.imshow('figure', input)
-            # rgb = np.zeros((pred.shape[1], pred.shape[2], 3))
-            #
-            # r = pred[0, :, :].copy()
-            # g = pred[0, :, :].copy()
-            # b = pred[0, :, :].copy()
-            #
-            # g[g != 1] = 0
-            # g[g == 1] = 255
-            #
-            # r[r != 2] = 0
-            # r[r == 2] = 255
-            # b = np.zeros(b.shape)
-            #
-            # rgb[:, :, 0] = b
-            # rgb[:, :, 1] = g
-            # rgb[:, :, 2] = r
-
-            # print(input.shape)
-            # print(rgb.shape)
-            # combi = np.append(input, rgb, axis=1)
-            # print(combi.shape)
-            # cv2.imshow('figure', input)
-            # cv2.imwrite('/home/robot/PycharmProjects/pytorch-deeplab-xception/run/cropweed/deeplab-resnet/experiment_13/test_samples/sample_orig_combi_{}.png'.format(ctr), input.astype(np.uint8))
-            # ctr += 1
-            # for sample in range(image.shape[0]):
-            #     label_mask = prediction[sample, :, :]
-            #     rgb = np.zeros((label_mask.shape[0], label_mask.shape[1], 3))
-            #     r = label_mask.copy()
-            #     g = label_mask.copy()
-            #     b = label_mask.copy()
-            #
-            #     g[g != 1] = 0
-            #     g[g == 1] = 255
-            #
-            #     r[r != 2] = 0
-            #     r[r == 2] = 255
-            #     b = np.zeros(b.shape)
-            #
-            #     rgb[:, :, 0] = b
-            #     rgb[:, :, 1] = g
-            #     rgb[:, :, 2] = r
-            #
-            #     cv2.putText(rgb, 'Ground truth',
-            #                 (10, 30),
-            #                 font,
-            #                 fontscale,
-            #                 fontcolor,
-            #                 linetype)
-            #
-            #     cv2.putText(rgb, 'Prediction',
-            #                 (800, 30),
-            #                 font,
-            #                 fontscale,
-            #                 fontcolor,
-            #                 linetype)
-            #     cv2.line(rgb, (513, 0), (513, 1020), (255, 255, 255), thickness=1)
-            #     # cv2.imshow('image', rgb)
-            #     cv2.imwrite('/home/robot/PycharmProjects/pytorch-deeplab-xception/run/cropweed/deeplab-resnet/experiment_13/test_samples/sample_{}.png'.format(ctr), rgb.astype(np.uint8))
-            #     cv2.imwrite('/home/robot/PycharmProjects/pytorch-deeplab-xception/run/cropweed/deeplab-resnet/experiment_13/test_samples/sample_orig_{}.png'.format(ctr), rgb.astype(np.uint8))
-            #     ctr += 1
+            print(pred.shape)
+            input = image[0, 0:3, :, :].cpu().numpy().transpose([1, 2, 0])
+            # cv2.imshow('figure', prediction)
+            # cv2.waitKey()
 
         # Fast test during the testing
         Acc = self.evaluator.Pixel_Accuracy()
@@ -286,6 +247,79 @@ class Trainer(object):
         FWIoU = self.evaluator.Frequency_Weighted_Intersection_over_Union()
         print('[INFO] Network performance measures on the test dataset are as follows: \n '
               'mIOU: {} \n FWIOU: {} \n Class accuracy: {} \n Pixel Accuracy: {}'.format(mIoU, FWIoU, Acc_class, Acc))
+
+        self.evaluator.per_class_accuracy()
+
+    def pred_single_image(self, path, counter):
+        self.model.eval()
+        img_path = path
+        lbl_path = os.path.join(os.path.split(os.path.split(path)[0])[0], 'lbl', os.path.split(path)[1])
+        activations = collections.defaultdict(list)
+        def save_activation(name, mod, input, output):
+            activations[name].append(output.cpu())
+
+        for name, m in self.model.named_modules():
+            if type(m) == nn.ReLU:
+                m.register_forward_hook(partial(save_activation, name))
+
+        input = cv2.imread(path)
+        input = cv2.resize(input, (513, 513), interpolation=cv2.INTER_CUBIC)
+        image = Image.open(img_path).convert('RGB')  # width x height x 3
+        _tmp = np.array(Image.open(lbl_path), dtype=np.uint8)
+        # _tmp = np.array(Image.open(img_path), dtype=np.uint8)
+        _tmp[_tmp == 255] = 1
+        _tmp[_tmp == 0] = 0
+        _tmp[_tmp == 128] = 2
+        _tmp = Image.fromarray(_tmp)
+
+        mean = (0.485, 0.456, 0.406)
+        std = (0.229, 0.224, 0.225)
+
+        composed_transforms = transforms.Compose([
+            tr.FixedResize(size=513),
+            tr.Normalize(mean=mean, std=std),
+            tr.ToTensor()])
+        sample = {'image': image, 'label': _tmp}
+        sample = composed_transforms(sample)
+
+        image, target = sample['image'], sample['label']
+
+        image = torch.unsqueeze(image, dim=0)
+        if self.args.cuda:
+            image, target = image.cuda(), target.cuda()
+        with torch.no_grad():
+            output = self.model(image)
+
+        pred = output.data.cpu().numpy()
+        target = target.cpu().numpy()
+        pred = np.argmax(pred, axis=1)
+        pred = np.reshape(pred, (513, 513))
+        prediction = np.append(target, pred, axis=1)
+
+        rgb = np.zeros((prediction.shape[0], prediction.shape[1], 3))
+
+        r = prediction.copy()
+        g = prediction.copy()
+        b = prediction.copy()
+
+        g[g != 1] = 0
+        g[g == 1] = 255
+
+        r[r != 2] = 0
+        r[r == 2] = 255
+        b = np.zeros(b.shape)
+
+        rgb[:, :, 0] = b
+        rgb[:, :, 1] = g
+        rgb[:, :, 2] = r
+
+        result = np.append(input, rgb.astype(np.uint8), axis=1)
+        cv2.line(rgb, (513, 0), (513, 1020), (255, 255, 255), thickness=1)
+        cv2.line(rgb, (513, 0), (513, 1020), (255, 255, 255), thickness=1)
+        cv2.imwrite('/home/robot/git/pytorch-deeplab-xception/run/cropweed/deeplab-resnet/experiment_41/samples/sample_orig_combi_{}.png'.format(counter), result)
+        # cv2.imshow(rgb)
+        # cv2.waitKey()
+
 
 def main():
     parser = argparse.ArgumentParser(description="PyTorch DeeplabV3Plus Training")
@@ -329,7 +363,7 @@ def main():
     parser.add_argument('--test-batch-size', type=int, default=None,
                         metavar='N', help='input batch size for \
                                 testing (default: auto)')
-    parser.add_argument('--use-balanced-weights', action='store_true', default=True,
+    parser.add_argument('--use-balanced-weights', action='store_true', default=False,
                         help='whether to use balanced weights (default: False)')
     # optimizer params
     parser.add_argument('--lr', type=float, default=None, metavar='LR',
@@ -385,7 +419,7 @@ def main():
             'coco': 30,
             'cityscapes': 200,
             'pascal': 50,
-            'cropweed': 20,
+            'cropweed': 10,
         }
         args.epochs = epoches[args.dataset.lower()]
 
@@ -413,7 +447,10 @@ def main():
     print('Starting Epoch:', trainer.args.start_epoch)
     print('Total Epoches:', trainer.args.epochs)
     if args.infer:
-        trainer.testing()
+        # trainer.testing()
+        files = glob('/home/robot/datasets/arox_samples/day2/weeds/*.jpg')
+        for file, index in zip(files, range(len(files))):
+            trainer.pred_single_image(file, index)
     else:
         for epoch in range(trainer.args.start_epoch, trainer.args.epochs):
             trainer.training(epoch)
