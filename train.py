@@ -14,6 +14,7 @@ from utils.saver import Saver
 from utils.summaries import TensorboardSummary
 from utils.metrics import Evaluator
 from utils.analysis import Analysis
+from utils.background_modifier import Modbackground
 
 import cv2
 from torchvision import transforms
@@ -22,6 +23,7 @@ from PIL import Image
 from glob import glob
 import collections
 from functools import partial
+import matplotlib.pyplot as plt
 
 class Denormalize(object):
     def __init__(self, mean, std, inplace=False):
@@ -264,10 +266,14 @@ class Trainer(object):
                 m.register_forward_hook(partial(save_activation, name))
 
         input = cv2.imread(path)
+        # bkg = cv2.createBackgroundSubtractorMOG2()
+        # back = bkg.apply(input)
+        # cv2.imshow('back', back)
+        # cv2.waitKey()
         input = cv2.resize(input, (513, 513), interpolation=cv2.INTER_CUBIC)
         image = Image.open(img_path).convert('RGB')  # width x height x 3
-        _tmp = np.array(Image.open(lbl_path), dtype=np.uint8)
-        # _tmp = np.array(Image.open(img_path), dtype=np.uint8)
+        # _tmp = np.array(Image.open(lbl_path), dtype=np.uint8)
+        _tmp = np.array(Image.open(img_path), dtype=np.uint8)
         _tmp[_tmp == 255] = 1
         _tmp[_tmp == 0] = 0
         _tmp[_tmp == 128] = 2
@@ -296,7 +302,8 @@ class Trainer(object):
         target = target.cpu().numpy()
         pred = np.argmax(pred, axis=1)
         pred = np.reshape(pred, (513, 513))
-        prediction = np.append(target, pred, axis=1)
+        # prediction = np.append(target, pred, axis=1)
+        prediction = pred
 
         rgb = np.zeros((prediction.shape[0], prediction.shape[1], 3))
 
@@ -315,13 +322,49 @@ class Trainer(object):
         rgb[:, :, 1] = g
         rgb[:, :, 2] = r
 
-        result = np.append(input, rgb.astype(np.uint8), axis=1)
+        prediction = np.append(input, rgb.astype(np.uint8), axis=1)
+        result = np.append(input, prediction.astype(np.uint8), axis=1)
         cv2.line(rgb, (513, 0), (513, 1020), (255, 255, 255), thickness=1)
         cv2.line(rgb, (513, 0), (513, 1020), (255, 255, 255), thickness=1)
-        cv2.imwrite('/home/robot/git/pytorch-deeplab-xception/run/cropweed/deeplab-resnet/experiment_41/samples/sample_orig_combi_{}.png'.format(counter), result)
-        # cv2.imshow(rgb)
+        cv2.imwrite('/home/robot/git/pytorch-deeplab-xception/run/cropweed/deeplab-resnet/experiment_41/samples/synthetic_{}.png'.format(counter), prediction)
+        # plt.imshow(prediction)
         # cv2.waitKey()
+        # plt.show()
 
+    def modify_background(self, src, target, out):
+        self.model.eval()
+        back_obj = Modbackground(src, target, None)
+        background = back_obj.source_background()
+        # image = Image.open(img_path).convert('RGB')  # width x height x 3
+        # # _tmp = np.array(Image.open(lbl_path), dtype=np.uint8)
+        # _tmp = np.array(Image.open(img_path), dtype=np.uint8)
+        # _tmp[_tmp == 255] = 1
+        # _tmp[_tmp == 0] = 0
+        # _tmp[_tmp == 128] = 2
+        # _tmp = Image.fromarray(_tmp)
+
+        mean = (0.485, 0.456, 0.406)
+        std = (0.229, 0.224, 0.225)
+
+        composed_transforms = transforms.Compose([
+            tr.FixedResize(size=513),
+            tr.Normalize(mean=mean, std=std),
+            tr.ToTensor()])
+        sample = {'image': image, 'label': _tmp}
+        sample = composed_transforms(sample)
+
+        image, target = sample['image'], sample['label']
+
+        image = torch.unsqueeze(image, dim=0)
+        if self.args.cuda:
+            image, target = image.cuda(), target.cuda()
+        with torch.no_grad():
+            output = self.model(image)
+
+        pred = output.data.cpu().numpy()
+        target = target.cpu().numpy()
+        pred = np.argmax(pred, axis=1)
+        pred = np.reshape(pred, (513, 513))
 
 def main():
     parser = argparse.ArgumentParser(description="PyTorch DeeplabV3Plus Training")
@@ -450,10 +493,14 @@ def main():
     print('Total Epoches:', trainer.args.epochs)
     if args.infer:
         # trainer.testing()
-        # files = glob('/home/robot/datasets/arox_samples/day2/weeds/*.jpg')    #AROX data
-        files = glob('/home/robot/datasets/structured_cwc/train/img/*.png')     # BonniRob data
-        for file, index in zip(files, range(len(files))):
+        src_files = glob('/home/robot/datasets/arox_samples/day1/weeds/*.jpg')    #AROX data
+        # src_files = glob('/home/robot/datasets/structured_cwc/train/img/*.png')     # BonniRob data
+        # files = glob('/home/robot/datasets/arox_samples/synthetic/*.png')     # Synthetic data
+        print('[INFO] Found {} samples in the given dataset. '.format(len(src_files)))
+        for file, index in zip(src_files, range(len(src_files))):
+            print('[INFO] Processing sample number {} . . . '.format(index + 1))
             trainer.pred_single_image(file, index)
+            # trainer.modify_background(src_files, target_files, None)
     else:
         for epoch in range(trainer.args.start_epoch, trainer.args.epochs):
             trainer.training(epoch)
