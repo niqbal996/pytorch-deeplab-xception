@@ -64,12 +64,12 @@ class Analysis(object):
                     ctr += 1
         return arr
     
-    def visualize_tensor(self, cv=True):
+    def visualize_tensor(self, image, cv=True):
         if cv:
-            cv2.imshow('tensor as image', self.image)
+            cv2.imshow('tensor as image', image)
             cv2.waitKey()
         else:
-            plt.imshow(self.image)
+            plt.imshow(image)
             plt.show()
         
         
