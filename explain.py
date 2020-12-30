@@ -220,25 +220,25 @@ class Trainer(object):
 
             # output = np.argmax(output, axis=2) * 255
             output = output.data.cpu().numpy()
-            output = np.argmax(output, axis=1)
-            output = np.squeeze(output, axis=0)
-            output[output == 1] = 255
-            if np.any(output == 2):
-                output[output == 2] = 128
-            if np.any(output == 1):
-                output[output == 1] = 255
-            print(np.unique(output))
+            prediction = np.argmax(output, axis=1)
+            prediction = np.squeeze(prediction, axis=0)
+            prediction[prediction == 1] = 255
+            if np.any(prediction == 2):
+                prediction[prediction == 2] = 128
+            if np.any(prediction == 1):
+                prediction[prediction == 1] = 255
+            print(np.unique(prediction))
 
-        # see = Analysis('module.decoder.last_conv.6', activations)
-        keys = [x for x in activations.keys() if not isinstance(x, list)]
-        for key in keys:
-            see = Analysis(key, activations, channel=2)
-            # see.visualize_tensor(see.image)
-            see.save_tensor(see.image, self.saver.experiment_dir)
+        see = Analysis(activations, label=1, path=self.saver.experiment_dir)
+        see.backtrace(output)
+        # for key in keys:
+        #
+        #     see.visualize_tensor(see.image)
+            # see.save_tensor(see.image, self.saver.experiment_dir)
 
         cv2.imwrite(os.path.join(self.saver.experiment_dir, 'rgb.png'), input)
         cv2.imwrite(os.path.join(self.saver.experiment_dir, 'lbl.png'), label)
-        cv2.imwrite(os.path.join(self.saver.experiment_dir, 'prediction.png'), output)
+        cv2.imwrite(os.path.join(self.saver.experiment_dir, 'prediction.png'), prediction)
         # pred = output.data.cpu().numpy()
         # target = target.cpu().numpy()
         # pred = np.argmax(pred, axis=1)
