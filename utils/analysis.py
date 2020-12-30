@@ -1,10 +1,13 @@
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+import math
+import os
 
 
 class Analysis(object):
-    def __init__(self, tensor_name, tensors_dict):
+    def __init__(self, tensor_name, tensors_dict, channel=0):
+        self.channel = channel
         self.key = tensor_name
         self.dict = tensors_dict
         self.tensor = self.get_tensor_from_key()
@@ -12,7 +15,7 @@ class Analysis(object):
         self.binary_image = self.image2binary()
         self.crop_filter = self.binary_image[0:129, 129:129 * 2]
         self.weed_filter = self.binary_image[774:774 + 129, 387:387 + 129]
-        self.mask = self.image2mask()
+        # self.mask = self.image2mask()
 
     def image2binary(self, threshold=50):
         binary_image = self.image.copy() * 255
@@ -28,8 +31,8 @@ class Analysis(object):
         filta = filta.astype(np.bool)
         plate = np.ones_like(filta, dtype=np.bool)
         ctr = 0
-        for row in range(16):
-            for col in range(16):
+        for row in range(math.floor(out.shape[0]/self.tensor.shape[0])):
+            for col in range(math.floor(out.shape[0]/self.tensor.shape[1])):
                 if ctr <= arra.shape[0]:
                     curr = arra[(row * filta.shape[0]):(row + 1) * filta.shape[0],
                                 (col * filta.shape[1]):(col + 1) * filta.shape[1]] & filta
@@ -46,14 +49,17 @@ class Analysis(object):
 
     def get_tensor_from_key(self):
         # TODO here taking tensor 0 but can be added as an argument for other tensors
-        tensor = self.dict[self.key][0]
+        if len(self.dict[self.key]) > 1:
+            tensor = self.dict[self.key][self.channel]
+        else:
+            tensor = self.dict[self.key][0]
         tensor = tensor.detach().cpu().numpy().reshape(tensor.shape[1], tensor.shape[2], tensor.shape[3])
 
         return tensor
 
     def tensor2image(self):
-        arr = np.zeros((int(np.sqrt(self.tensor.shape[0])) * self.tensor.shape[1], 
-                        int(np.sqrt(self.tensor.shape[0])) * self.tensor.shape[2]),
+        arr = np.zeros((math.ceil(np.sqrt(self.tensor.shape[0])) * self.tensor.shape[1],
+                        math.ceil(np.sqrt(self.tensor.shape[0])) * self.tensor.shape[2]),
                        dtype=np.float32)
         ctr = 0
         for row in range(int(np.sqrt(self.tensor.shape[0]))):
@@ -65,13 +71,19 @@ class Analysis(object):
         return arr
     
     def visualize_tensor(self, image, cv=True):
-        if cv:
-            cv2.imshow('tensor as image', image)
-            cv2.waitKey()
-        else:
-            plt.imshow(image)
-            plt.show()
-        
+            if cv:
+                print(np.max(image))
+                cv2.imshow('tensor as image', image)
+                cv2.waitKey()
+            else:
+                plt.imshow(image)
+                plt.show()
+
+    def save_tensor(self, image, path):
+        # print('min: {} max: {}'.format(np.min(image), np.max(image)))
+        image = ((image / np.max(image)) * 255).astype(np.int8)
+        # cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+        cv2.imwrite(os.path.join(path, '{}.png'.format(self.key)), image)
         
     
     
