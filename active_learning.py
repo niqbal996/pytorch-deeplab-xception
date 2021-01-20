@@ -2,6 +2,19 @@ import argparse
 import os
 import numpy as np
 from tqdm import tqdm
+# from openTSNE import TSNE
+# from sklearn.manifold import TSNE
+# from cuml.manifold import TSNE #this gives best results so far
+
+import cv2
+from torchvision import transforms
+from dataloaders import custom_transforms as tr
+from PIL import Image
+from glob import glob
+
+import collections
+from functools import partial
+import matplotlib.pyplot as plt
 
 from mypath import Path
 from dataloaders import make_data_loader
@@ -14,18 +27,7 @@ from utils.saver import Saver
 from utils.summaries import TensorboardSummary
 from utils.metrics import Evaluator
 from utils.analysis import Analysis
-from utils.background_modifier import Modbackground
-
-import cv2
-from torchvision import transforms
-from dataloaders import custom_transforms as tr
-from PIL import Image
-from glob import glob
-from sklearn.manifold import TSNE
-import collections
-from functools import partial
-import matplotlib.pyplot as plt
-
+# from utils.background_modifier import Modbackground
 
 class Denormalize(object):
     def __init__(self, mean, std, inplace=False):
@@ -221,10 +223,23 @@ class Trainer(object):
     def calculate_scores(self):
         train_loss = 0.0
         self.model.eval()
-        gradient_embeddings = np.zeros((2, len(self.train_loader)))
-        tbar = tqdm(self.train_loader)
-        num_img_tr = len(self.train_loader)
+
+        loader = self.val_loader
+        shape = self.model.module.backbone.layer4[2].conv2.weight.shape
+        gradient_embeddings = np.zeros((shape[0]*shape[1], len(loader)))
+        # gradient_embeddings = np.zeros((512*33*33, len(loader)))
+        # tbar = tqdm(self.train_loader)
+        tbar = tqdm(loader)
+        num_img_tr = len(loader)
         for i, sample in enumerate(tbar):
+            # activations = collections.defaultdict(list)
+            # def save_activation(name, mod, input, output):
+            #     activations[name].append(output.cpu())
+            #
+            # for name, m in self.model.named_modules():
+            #     if name == 'module.backbone.layer4.2.relu':
+            #         m.register_forward_hook(partial(save_activation, name))
+            #
             image, target = sample['image'], sample['label']
             if self.args.cuda:
                 image, target = image.cuda(), target.cuda()
@@ -234,17 +249,29 @@ class Trainer(object):
             loss = self.criterion(output, target)
             loss.backward()
             self.optimizer.step()
-            score = self.model.module.decoder.conv1.weight.grad
-            score = score.cpu().data.numpy()[:, :, 0, 0]
-            tmp = TSNE(n_components=2).fit_transform(score)
-            gradient_embeddings[:, i] = tmp
+            # score = activations['module.backbone.layer4.2.relu'][0].data.numpy().flatten()
+            score = self.model.module.backbone.layer4[2].conv2.weight.grad
+            score = score.cpu().data.numpy()[:, :, 0, 0].flatten()
+            gradient_embeddings[:, i] = score
             train_loss += loss.item()
             tbar.set_description('Train loss: %.3f' % (train_loss / (i + 1)))
             self.writer.add_scalar('train/total_loss_iter', loss.item(), i + num_img_tr)
-
+        with open('feature_maps/backbone_layer_4_conv2_gradients_trained.npy', 'wb') as f:
+            print('[INFO] saving the gradients into hard disk')
+            np.save(f, gradient_embeddings)
+        # with open('gradients.npy', 'rb') as f:
+        #     print('[INFO] Loading the gradients from hard disk')
+        #     gradient_embeddings = np.load(f)
+        # print('[INFO] Calculating TSNE embeddings')
+        #
+        # embeddings = tsne.fit(gradient_embeddings)
+        # # embeddings = TSNE(n_components=2).fit_transform(gradient_embeddings)
+        # print('[INFO] Plotting the embeddings')
+        # plt.scatter(embeddings[0], embeddings[1])
+        # plt.show()
         self.writer.add_scalar('total_score', train_loss)
-        print('[Epoch: %d, numImages: %5d]' % (i, i * self.args.batch_size + image.data.shape[0]))
-        print('Loss: %.3f' % train_loss)
+        # print('[Epoch: %d, numImages: %5d]' % (i, i * self.args.batch_size + image.data.shape[0]))
+        # print('Loss: %.3f' % train_loss)
 
     def pred_single_image(self, path, counter):
         self.model.eval()
