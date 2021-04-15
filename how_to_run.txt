@@ -1,0 +1,15 @@
+# pull docker image
+
+docker pull nvcr.io/nvidia/tritonserver:21.03-py3
+
+
+# running triton server with default model repo with cpu support
+$ docker run --rm -p8000:8000 -p8001:8001 -p8002:8002 -v /home/naeem/git/triton/docs/examples/model_repository:/models
+ nvcr.io/nvidia/tritonserver:21.03-py3 tritonserver --model-repository=/models
+
+# running deeplabv3 model serving server 
+
+docker run --rm -p8000:8000 -p8001:8001 -p8002:8002 -v /home/naeem/model_repository:/models 
+nvcr.io/nvidia/tritonserver:21.03-py3 tritonserver --model-repository=/models
+
+
